@@ -40,6 +40,14 @@ class ScanNetData(object):
                               f'scannetv2_{split}.txt')
         mmcv.check_file_exist(split_file)
         self.sample_id_list = mmcv.list_from_file(split_file)
+        # Process only the sample ids that have been downloaded
+        sample_id_list_temp = []
+        all_samples_dir = osp.join(self.root_dir, 'scans')
+        all_samples_list = os.listdir(all_samples_dir)
+        for id in self.sample_id_list:
+            if id in all_samples_list:  
+                sample_id_list_temp.append(id)
+        self.sample_id_list = sample_id_list_temp
         self.test_mode = (split == 'test')
 
     def __len__(self):
@@ -110,6 +118,8 @@ class ScanNetData(object):
             pts_filename = osp.join(self.root_dir, 'scannet_instance_data',
                                     f'{sample_idx}_vert.npy')
             points = np.load(pts_filename)
+            # Zero out the rgb data
+            points[:, 3:] = 0
             mmcv.mkdir_or_exist(osp.join(self.root_dir, 'points'))
             points.tofile(
                 osp.join(self.root_dir, 'points', f'{sample_idx}.bin'))
