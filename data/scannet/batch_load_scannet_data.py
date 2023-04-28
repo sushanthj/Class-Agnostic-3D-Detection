@@ -18,9 +18,10 @@ import numpy as np
 from load_scannet_data import export
 
 DONOTCARE_CLASS_IDS = np.array([])
-OBJ_CLASS_IDS = np.array(
-    [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
+# OBJ_CLASS_IDS = np.array(
+#     [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
 
+OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 10, 12, 14, 15, 17, 24, 25, 29, 31, 32, 33, 34, 35, 36])
 
 def export_one_scan(scan_name,
                     output_filename_prefix,
@@ -96,10 +97,10 @@ def batch_export(max_num_point,
         print(datetime.datetime.now())
         print(scan_name)
         output_filename_prefix = osp.join(output_folder, scan_name)
-        if osp.isfile(f'{output_filename_prefix}_vert.npy'):
-            print('File already exists. skipping.')
-            print('-' * 20 + 'done')
-            continue
+        # if osp.isfile(f'{output_filename_prefix}_vert.npy'):
+        #     print('File already exists. skipping.')
+        #     print('-' * 20 + 'done')
+        #     continue
         try:
             export_one_scan(scan_name, output_filename_prefix, max_num_point,
                             label_map_file, scannet_dir, test_mode)
@@ -130,11 +131,14 @@ def main():
         help='The path of label map file.')
     parser.add_argument(
         '--train_scan_names_file',
-        default='meta_data/scannet_train.txt',
+        # default='meta_data/scannet_train.txt',
+        default='meta_data/scannet_train_downloaded.txt',
+        # default='meta_data/scannet_train_custom.txt',
         help='The path of the file that stores the scan names.')
     parser.add_argument(
         '--test_scan_names_file',
         default='meta_data/scannetv2_test.txt',
+        # default='meta_data/scannetv2_val_custom.txt',
         help='The path of the file that stores the scan names.')
     args = parser.parse_args()
     batch_export(

@@ -46,11 +46,34 @@ class ScanNetDataset(Custom3DDataset):
         test_mode (bool, optional): Whether the dataset is in test mode.
             Defaults to False.
     """
-    CLASSES = ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-               'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-               'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
-               'garbagebin')
+    # CLASSES = ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
+    #            'bookshelf', 'picture', 'counter', 'desk', 'curtain',
+    #            'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
+    #            'garbagebin')
+    # CLASSES = ('cabinet', 'chair', 'sofa', 'table', 'counter', 'desk') 
+    # OBJECTS = [3, 5, 6, 7, 12, 14]
+    # CLASSES = ('cabinet', 'chair', 'sofa', 'table', 'counter', 'desk', 'person') 
+    # OBJECTS = [3, 5, 6, 7, 12, 14, 31]
+    # CLASSES = ('small_object', 'large_object')
+    CLASSES = (
+            'cabinet', 'bed', 'chair', 'sofa', 'table', 'bookshelf', 'counter',
+            'desk', 'shelves', 'dresser', 'refrigerator', 'television', 'box',
+            'person', 'night_stand', 'toilet', 'sink', 'lamp', 'bathtub')
+    OBJECTS = [3, 4, 5, 6, 7, 10, 12, 14, 15, 17, 24, 25, 29, 31, 32, 33, 34, 35, 36]
+    # SMALL_OBJECTS = [3, 5, 8, 11, 24, 28, 33, 34, 39]
+    # LARGE_OBJECTS = [4, 6, 7, 9, 10, 12, 14, 16, 36]
+    # SMALL_OBJECTS = [3, 5, 15, 17, 24, 25, 28, 29, 31, 32, 33, 34, 35, 39]
+    # LARGE_OBJECTS = [4, 6, 7, 10, 12, 14, 36]
+    
+    # SMALL_OBJECTS = [3, 5, 17, 25, 29, 31, 32, 33, 34, 35]
+    # LARGE_OBJECTS = [4, 6, 7, 10, 12, 14, 15, 24, 36]
+   
 
+
+    # SEEN_SMALL_OBJECTS = [3, 5, 8, 28, 33, 34, 39]
+    # SEEN_LARGE_OBJECTS = [6, 7, 9, 10, 12, 14, 36]
+    # UNSEEN_SMALL_OBJECTS = [11, 24]
+    # UNSEEN_LARGE_OBJECTS = [4, 16]
     def __init__(self,
                  data_root,
                  ann_file,
@@ -71,6 +94,56 @@ class ScanNetDataset(Custom3DDataset):
             filter_empty_gt=filter_empty_gt,
             test_mode=test_mode,
             **kwargs)
+        
+        empty_ids = []
+
+        for info_id, info in enumerate(self.data_infos):
+            gt_labels_3d = []
+            invalid_indices = []
+            if info['annos']['gt_num'] != 0: 
+                for i, label in enumerate(info['annos']['class']):
+                    # if self.test_mode:
+                    #     if label in self.UNSEEN_SMALL_OBJECTS:
+                    #         gt_labels_3d.append(0)
+                    #     elif label in self.UNSEEN_LARGE_OBJECTS:
+                    #         gt_labels_3d.append(1)
+                    #     else:
+                    #         invalid_indices.append(i)
+                    # else:
+                    #     if label in self.SEEN_SMALL_OBJECTS:
+                    #         gt_labels_3d.append(0)
+                    #     elif label in self.SEEN_LARGE_OBJECTS:
+                    #         gt_labels_3d.append(1)
+                    #     else:
+                    #         invalid_indices.append(i)
+                    # if label in self.SEEN_SMALL_OBJECTS:
+                    #     gt_labels_3d.append(0)
+                    # elif label in self.SEEN_LARGE_OBJECTS:
+                    #     gt_labels_3d.append(1)
+                    # else:
+                    #     invalid_indices.append(i)
+                    
+                    # print('*'*40, 'label: ', label)
+                    if label in self.OBJECTS:
+                        gt_labels_3d.append(label)
+                    else:
+                        # print('*'*40, 'invalid label: ', label)
+                        invalid_indices.append(i)
+                info['annos']['class'] = np.array(gt_labels_3d)
+                info['annos']['gt_num'] = len(info['annos']['class'])
+                annos_keys = ['name', 'location', 'dimensions', 'gt_boxes_upright_depth', 'unaligned_location', 'unaligned_dimensions', 'unaligned_gt_boxes_upright_depth', 'index']
+                for key in annos_keys:
+                    info['annos'][key] = np.delete(info['annos'][key], invalid_indices, axis=0)
+                if info['annos']['gt_num'] == 0:
+                    # print("---------------------------------------------------------------- Annos empty!")
+                    empty_ids.append(info_id)    
+            else:
+                # print("---------------------------------------------------------------- Annos empty!")
+                empty_ids.append(info_id)
+        print('*'*40, len(self.data_infos), type(self.data_infos))
+        self.data_infos = [i for j, i in enumerate(self.data_infos) if j not in empty_ids]
+        print('*'*40, len(self.data_infos), type(self.data_infos))
+
         assert 'use_camera' in self.modality and \
                'use_depth' in self.modality
         assert self.modality['use_camera'] or self.modality['use_depth']
@@ -147,6 +220,15 @@ class ScanNetDataset(Custom3DDataset):
             gt_bboxes_3d = info['annos']['gt_boxes_upright_depth'].astype(
                 np.float32)  # k, 6
             gt_labels_3d = info['annos']['class'].astype(np.int64)
+            # gt_labels_3d_temp = []
+            # for label in gt_labels_3d:
+            #     if label in self.SMALL_OBJECTS_LIST:
+            #         gt_labels_3d_temp.append(0)
+            #     else:
+            #         gt_labels_3d_temp.append(1)
+            # print(type(gt_labels_3d))
+            # gt_labels_3d = np.array(gt_labels_3d_temp)
+            
         else:
             gt_bboxes_3d = np.zeros((0, 6), dtype=np.float32)
             gt_labels_3d = np.zeros((0, ), dtype=np.int64)

@@ -22,15 +22,14 @@ class ScanNetData(object):
         self.split = split
         self.split_dir = osp.join(root_path)
         self.classes = [
-            'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-            'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-            'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
-            'garbagebin'
-        ]
+            'cabinet', 'bed', 'chair', 'sofa', 'table', 'bookshelf', 'counter',
+            'desk', 'shelves', 'dresser', 'refrigerator', 'television', 'box',
+            'person', 'night_stand', 'toilet', 'sink', 'lamp', 'bathtub']
+
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}
         self.label2cat = {self.cat2label[t]: t for t in self.cat2label}
         self.cat_ids = np.array(
-            [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
+            [3, 4, 5, 6, 7, 10, 12, 14, 15, 17, 24, 25, 29, 31, 32, 33, 34, 35, 36])
         self.cat_ids2class = {
             nyu40id: i
             for i, nyu40id in enumerate(list(self.cat_ids))
