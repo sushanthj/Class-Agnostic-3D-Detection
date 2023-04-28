@@ -29,6 +29,33 @@ try:
 except ImportError:
     from mmdet3d.utils import setup_multi_processes
 
+from mmcv.runner.hooks import HOOKS, Hook
+
+
+@HOOKS.register_module()
+class AdverserialTrainingHook(Hook):
+    def __init__(self, interval=5):
+        self.interval = interval
+
+    def before_train_iter(self, runner):
+        if self.every_n_iters(runner, self.interval):
+            # Unfreeze rest of the model and freeze discriminator
+            runner.model.module.head.train_disc = False
+            for name, param in runner.model.named_parameters():
+                if "module.head.disc_conv" in name:
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True
+    
+    def after_train_iter(self, runner):
+        if self.every_n_iters(runner, self.interval):
+            # Freeze rest of the model and unfreeze discriminator
+            runner.model.module.head.train_disc = True
+            for name, param in runner.model.named_parameters():
+                if "module.head.disc_conv" in name:
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
