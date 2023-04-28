@@ -177,7 +177,6 @@ def eval_map_recall(pred, gt, ovthresh=None):
     Return:
         tuple[dict]: dict results of recall, AP, and precision for all classes.
     """
-
     ret_values = {}
     for classname in gt.keys():
         if classname in pred:
@@ -198,6 +197,121 @@ def eval_map_recall(pred, gt, ovthresh=None):
                 ap[iou_idx][label] = np.zeros(1)
 
     return recall, precision, ap
+
+
+# def indoor_eval(gt_annos,
+#                 dt_annos,
+#                 metric,
+#                 label2cat,
+#                 logger=None,
+#                 box_type_3d=None,
+#                 box_mode_3d=None):
+#     """Indoor Evaluation.
+
+#     Evaluate the result of the detection.
+
+#     Args:
+#         gt_annos (list[dict]): Ground truth annotations.
+#         dt_annos (list[dict]): Detection annotations. the dict
+#             includes the following keys
+
+#             - labels_3d (torch.Tensor): Labels of boxes.
+#             - boxes_3d (:obj:`BaseInstance3DBoxes`):
+#                 3D bounding boxes in Depth coordinate.
+#             - scores_3d (torch.Tensor): Scores of boxes.
+#         metric (list[float]): IoU thresholds for computing average precisions.
+#         label2cat (dict): Map from label to category.
+#         logger (logging.Logger | str, optional): The way to print the mAP
+#             summary. See `mmdet.utils.print_log()` for details. Default: None.
+
+#     Return:
+#         dict[str, float]: Dict of results.
+#     """
+#     assert len(dt_annos) == len(gt_annos)
+#     pred = {}  # map {class_id: pred}
+#     gt = {}  # map {class_id: gt}
+
+#     for img_id in range(len(dt_annos)):
+#         # parse detected annotations
+#         det_anno = dt_annos[img_id]
+#         for i in range(len(det_anno['labels_3d'])):
+#             label = det_anno['labels_3d'].numpy()[i]
+#             bbox = det_anno['boxes_3d'].convert_to(box_mode_3d)[i]
+#             score = det_anno['scores_3d'].numpy()[i]
+#             if label not in pred:
+#                 pred[int(label)] = {}
+#             if img_id not in pred[label]:
+#                 pred[int(label)][img_id] = []
+#             if label not in gt:
+#                 gt[int(label)] = {}
+#             if img_id not in gt[label]:
+#                 gt[int(label)][img_id] = []
+#             pred[int(label)][img_id].append((bbox, score))
+
+#         # parse gt annotations
+#         gt_anno = gt_annos[img_id]
+#         if gt_anno['gt_num'] != 0:
+#             gt_boxes = box_type_3d(
+#                 gt_anno['gt_boxes_upright_depth'],
+#                 box_dim=gt_anno['gt_boxes_upright_depth'].shape[-1],
+#                 origin=(0.5, 0.5, 0.5)).convert_to(box_mode_3d)
+#             labels_3d = gt_anno['class']
+#         else:
+#             gt_boxes = box_type_3d(np.array([], dtype=np.float32))
+#             labels_3d = np.array([], dtype=np.int64)
+
+#         LARGE_OBJECTS = [4, 6, 7, 10, 12, 14, 15, 24, 36]
+#         labels_3d = np.where(np.isin(labels_3d, LARGE_OBJECTS), 1, 0)
+        
+#         for i in range(len(labels_3d)):
+#             label = labels_3d[i]
+#             bbox = gt_boxes[i]
+#             if label not in gt:
+#                 gt[label] = {}
+#             if img_id not in gt[label]:
+#                 gt[label][img_id] = []
+#             gt[label][img_id].append(bbox)
+#             print(gt.keys())
+
+#     rec, prec, ap = eval_map_recall(pred, gt, metric)
+#     ret_dict = dict()
+#     header = ['classes']
+#     table_columns = [[label2cat[label]
+#                       for label in ap[0].keys()] + ['Overall']]
+
+#     for i, iou_thresh in enumerate(metric):
+#         # header.append(f'AP_{iou_thresh:.2f}')
+#         header.append(f'AR_{iou_thresh:.2f}')
+
+#         rec_list = []
+#         # for label in ap[i].keys():
+#         #     ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+#         #         ap[i][label][0])
+#         # ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+#         #     np.mean(list(ap[i].values())))
+
+#         # table_columns.append(list(map(float, list(ap[i].values()))))
+#         # table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+#         # table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+#         for label in rec[i].keys():
+#             ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
+#                 rec[i][label][-1])
+#             rec_list.append(rec[i][label][-1])
+#         ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+
+#         table_columns.append(list(map(float, rec_list)))
+#         table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
+#         table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+#     table_data = [header]
+#     table_rows = list(zip(*table_columns))
+#     table_data += table_rows
+#     table = AsciiTable(table_data)
+#     table.inner_footing_row_border = True
+#     print_log('\n' + table.table, logger=logger)
+
+#     return ret_dict
 
 
 def indoor_eval(gt_annos,
@@ -230,7 +344,10 @@ def indoor_eval(gt_annos,
     """
     assert len(dt_annos) == len(gt_annos)
     pred = {}  # map {class_id: pred}
-    gt = {}  # map {class_id: gt}
+    gt_seen = {}  # map {class_id: gt}
+    gt_unseen = {}  # map {class_id: gt}
+    gt_all = {}    # map {class_id: gt}
+
     for img_id in range(len(dt_annos)):
         # parse detected annotations
         det_anno = dt_annos[img_id]
@@ -242,10 +359,18 @@ def indoor_eval(gt_annos,
                 pred[int(label)] = {}
             if img_id not in pred[label]:
                 pred[int(label)][img_id] = []
-            if label not in gt:
-                gt[int(label)] = {}
-            if img_id not in gt[label]:
-                gt[int(label)][img_id] = []
+            if label not in gt_unseen:
+                gt_unseen[int(label)] = {}
+            if img_id not in gt_unseen[label]:
+                gt_unseen[int(label)][img_id] = []
+            if label not in gt_seen:
+                gt_seen[int(label)] = {}
+            if img_id not in gt_seen[label]:
+                gt_seen[int(label)][img_id] = []
+            if label not in gt_all:
+                gt_all[int(label)] = {}
+            if img_id not in gt_all[label]:
+                gt_all[int(label)][img_id] = []
             pred[int(label)][img_id].append((bbox, score))
 
         # parse gt annotations
@@ -260,39 +385,66 @@ def indoor_eval(gt_annos,
             gt_boxes = box_type_3d(np.array([], dtype=np.float32))
             labels_3d = np.array([], dtype=np.int64)
 
+        LARGE_OBJECTS = [4, 6, 7, 10, 12, 14, 15, 24, 36]
+        UNSEEN_OBJECTS = [4, 10, 17, 29]
+        
         for i in range(len(labels_3d)):
             label = labels_3d[i]
             bbox = gt_boxes[i]
-            if label not in gt:
-                gt[label] = {}
-            if img_id not in gt[label]:
-                gt[label][img_id] = []
-            gt[label][img_id].append(bbox)
 
-    rec, prec, ap = eval_map_recall(pred, gt, metric)
+            if label in UNSEEN_OBJECTS:
+                if label in LARGE_OBJECTS:
+                    label = 1
+                else:
+                    label = 0
+                if label not in gt_unseen:
+                    gt_unseen[label] = {}
+                if img_id not in gt_unseen[label]:
+                    gt_unseen[label][img_id] = []
+                gt_unseen[label][img_id].append(bbox)
+            else:
+                if label in LARGE_OBJECTS:
+                    label = 1
+                else:
+                    label = 0
+                if label not in gt_seen:
+                    gt_seen[label] = {}
+                if img_id not in gt_seen[label]:
+                    gt_seen[label][img_id] = []
+                gt_seen[label][img_id].append(bbox)
+
+            if label not in gt_all:
+                gt_all[label] = {}
+            if img_id not in gt_all[label]:
+                gt_all[label][img_id] = []
+            gt_all[label][img_id].append(bbox)
+
+    rec_seen, prec_seen, ap_seen = eval_map_recall(pred, gt_seen, metric)
+    
     ret_dict = dict()
     header = ['classes']
     table_columns = [[label2cat[label]
-                      for label in ap[0].keys()] + ['Overall']]
+                      for label in ap_seen[0].keys()] + ['Overall']]
 
     for i, iou_thresh in enumerate(metric):
-        header.append(f'AP_{iou_thresh:.2f}')
+        # header.append(f'AP_{iou_thresh:.2f}')
         header.append(f'AR_{iou_thresh:.2f}')
+
         rec_list = []
-        for label in ap[i].keys():
-            ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
-                ap[i][label][0])
-        ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
-            np.mean(list(ap[i].values())))
+        # for label in ap[i].keys():
+        #     ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+        #         ap[i][label][0])
+        # ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+        #     np.mean(list(ap[i].values())))
 
-        table_columns.append(list(map(float, list(ap[i].values()))))
-        table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
-        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+        # table_columns.append(list(map(float, list(ap[i].values()))))
+        # table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+        # table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
 
-        for label in rec[i].keys():
+        for label in rec_seen[i].keys():
             ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
-                rec[i][label][-1])
-            rec_list.append(rec[i][label][-1])
+                rec_seen[i][label][-1])
+            rec_list.append(rec_seen[i][label][-1])
         ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
 
         table_columns.append(list(map(float, rec_list)))
@@ -304,6 +456,87 @@ def indoor_eval(gt_annos,
     table_data += table_rows
     table = AsciiTable(table_data)
     table.inner_footing_row_border = True
-    print_log('\n' + table.table, logger=logger)
+    print_log("\n\nSeen Classes: ")
+    print_log(table.table, logger=logger)
+
+    rec_unseen, prec_unseen, ap_unseen = eval_map_recall(pred, gt_unseen, metric)
+    
+    ret_dict = dict()
+    header = ['classes']
+    table_columns = [[label2cat[label]
+                      for label in ap_unseen[0].keys()] + ['Overall']]
+
+    for i, iou_thresh in enumerate(metric):
+        # header.append(f'AP_{iou_thresh:.2f}')
+        header.append(f'AR_{iou_thresh:.2f}')
+
+        rec_list = []
+        # for label in ap[i].keys():
+        #     ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+        #         ap[i][label][0])
+        # ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+        #     np.mean(list(ap[i].values())))
+
+        # table_columns.append(list(map(float, list(ap[i].values()))))
+        # table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+        # table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+        for label in rec_unseen[i].keys():
+            ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
+                rec_unseen[i][label][-1])
+            rec_list.append(rec_unseen[i][label][-1])
+        ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+
+        table_columns.append(list(map(float, rec_list)))
+        table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
+        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+    table_data = [header]
+    table_rows = list(zip(*table_columns))
+    table_data += table_rows
+    table = AsciiTable(table_data)
+    table.inner_footing_row_border = True
+    print_log("\nUnseen Classes: ")
+    print_log(table.table, logger=logger)
+
+    rec_all, prec_all, ap_all = eval_map_recall(pred, gt_all, metric)
+    
+    ret_dict = dict()
+    header = ['classes']
+    table_columns = [[label2cat[label]
+                      for label in ap_all[0].keys()] + ['Overall']]
+
+    for i, iou_thresh in enumerate(metric):
+        # header.append(f'AP_{iou_thresh:.2f}')
+        header.append(f'AR_{iou_thresh:.2f}')
+
+        rec_list = []
+        # for label in ap[i].keys():
+        #     ret_dict[f'{label2cat[label]}_AP_{iou_thresh:.2f}'] = float(
+        #         ap[i][label][0])
+        # ret_dict[f'mAP_{iou_thresh:.2f}'] = float(
+        #     np.mean(list(ap[i].values())))
+
+        # table_columns.append(list(map(float, list(ap[i].values()))))
+        # table_columns[-1] += [ret_dict[f'mAP_{iou_thresh:.2f}']]
+        # table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+        for label in rec_all[i].keys():
+            ret_dict[f'{label2cat[label]}_rec_{iou_thresh:.2f}'] = float(
+                rec_all[i][label][-1])
+            rec_list.append(rec_all[i][label][-1])
+        ret_dict[f'mAR_{iou_thresh:.2f}'] = float(np.mean(rec_list))
+
+        table_columns.append(list(map(float, rec_list)))
+        table_columns[-1] += [ret_dict[f'mAR_{iou_thresh:.2f}']]
+        table_columns[-1] = [f'{x:.4f}' for x in table_columns[-1]]
+
+    table_data = [header]
+    table_rows = list(zip(*table_columns))
+    table_data += table_rows
+    table = AsciiTable(table_data)
+    table.inner_footing_row_border = True
+    print_log("\nAll Classes: ")
+    print_log(table.table, logger=logger)
 
     return ret_dict
