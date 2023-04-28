@@ -9,16 +9,28 @@ model = dict(
         type='TR3DNeck',
         in_channels=(64, 128, 128, 128),
         out_channels=128),
+    # head=dict(
+    #     type='TR3DHead',
+    #     in_channels=128,
+    #     n_reg_outs=6,
+    #     n_classes=18,
+    #     voxel_size=voxel_size,
+    #     assigner=dict(
+    #         type='TR3DAssigner',
+    #         top_pts_threshold=6,
+    #         label2level=[0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0]),
+    #     bbox_loss=dict(type='AxisAlignedIoULoss', mode='diou', reduction='none')),
     head=dict(
-        type='TR3DHead',
+        type='TR3DHeadAdver',
         in_channels=128,
         n_reg_outs=6,
-        n_classes=18,
+        n_classes_ono=2, # small object, large object
+        n_classes_disc=19, # small object, large object
         voxel_size=voxel_size,
         assigner=dict(
             type='TR3DAssigner',
             top_pts_threshold=6,
-            label2level=[0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0]),
+            label2level=[0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1]),
         bbox_loss=dict(type='AxisAlignedIoULoss', mode='diou', reduction='none')),
     train_cfg=dict(),
     test_cfg=dict(nms_pre=1000, iou_thr=.5, score_thr=.01))
@@ -26,8 +38,9 @@ model = dict(
 optimizer = dict(type='AdamW', lr=.001, weight_decay=.0001)
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 lr_config = dict(policy='step', warmup=None, step=[8, 11])
-runner = dict(type='EpochBasedRunner', max_epochs=12)
-custom_hooks = [dict(type='EmptyCacheHook', after_iter=True)]
+runner = dict(type='EpochBasedRunner', max_epochs=25)
+# custom_hooks = [dict(type='EmptyCacheHook', after_iter=True)]
+custom_hooks = [dict(type='EmptyCacheHook', after_iter=True), dict(type='AdverserialTrainingHook', interval=5)]
 
 checkpoint_config = dict(interval=1, max_keep_ckpts=1)
 log_config = dict(
@@ -45,10 +58,11 @@ workflow = [('train', 1)]
 
 dataset_type = 'ScanNetDataset'
 data_root = './data/scannet/'
-class_names = ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-               'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-               'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
-               'garbagebin')
+# class_names = ('cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
+#                'bookshelf', 'picture', 'counter', 'desk', 'curtain',
+#                'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
+#                'garbagebin')
+class_names = ('small_object', 'large_object')
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
